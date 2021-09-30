@@ -1,0 +1,325 @@
+<!DOCTYPE html><html><head><title>元件章節作業</title><meta name="viewport" content="width=device-width, initial-scale=1"><link href="images/favicon.ico" rel="shortcut icon"><meta charset="UTF-8"><script src="/javascripts/vendor.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.0.2/vue.global.js"></script></head><body class="bg-lighter">
+<div class="container main my-5"><div class="row"><main class="col post">
+<!-- 章節標題 --><div class="mb-4"><h1 class="mt-0 text-muted">元件章節作業</h1><small>檔名：<code>component_final.html</code></small></div>
+<!-- 🔥🔥練習開始🔥🔥 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.21.1/axios.min.js"></script>
+<div class="container" id="app">
+  <!-- <h3>作業條件：</h3>
+  <ol>
+    <li>將以下範例改為 Vue 的版本</li>
+    <li>卡片、分頁要製作成 “元件”</li>
+    <li>分頁要善用 props 及 emits 的觀念</li>
+  </ol> -->
+<!-- 內容 -->
+
+  <div class="row">
+      <card-component :item="item" v-for="item in showPage" :key="item.Id"></card-component>
+  </div>
+<!-- 分頁 -->
+  <div class="d-flex justify-content-center mt-4">
+    <nav aria-label="Page navigation example">
+      <page-component @change-page="changePage" @next-page="nextPage" @prev-page="prevPage" :page-status="pageStatus" :page-total="spotListFilter"></page-component>
+    </nav>
+  </div>
+</div>
+
+<style>
+.img-cover {
+  object-fit: cover;
+}
+</style>
+
+<script type="module">
+// API 說明：https://api.kcg.gov.tw/ServiceList/Detail/9c8e1450-e833-499c-8320-29b36b7ace5c
+// API 路徑：https://api.kcg.gov.tw/api/service/Get/9c8e1450-e833-499c-8320-29b36b7ace5c
+// 備用 API：https://raw.githubusercontent.com/hexschool/KCGTravel/master/datastore_search.json
+import 'https://unpkg.com/mitt/dist/mitt.umd.js';
+const emitter = mitt();//這次外部套件方法
+const jsonUrl = 'https://api.kcg.gov.tw/api/service/Get/9c8e1450-e833-499c-8320-29b36b7ace5c';
+// const content = document.getElementById('content');
+// const pageid = document.getElementById('pageid');
+// let jsonData = {};
+const app = Vue.createApp({
+    data() {
+    return {
+      pageStatus:0, //起始頁數
+      perpage: 20,  //預設每一頁只顯示 20 筆
+      spotListFilter:[],//內容過濾
+      spotList: [],  //總內容
+    };
+  },
+  methods: {//方法 觸發 (物件)
+    getData() { //取得遠端資料成功與否
+      return new Promise((resolve, reject) => {
+        axios.get(jsonUrl).then((res) => {
+          if (res.data.success && res.status === 200) {
+            resolve(res.data.data.XML_Head.Infos.Info);
+          } else {
+            reject('執行狀況:' + res.status);
+          }
+        }).catch(err => {
+          reject(err);
+        })
+      });
+    },
+    //分頁數量與頁面筆數
+    getDataPage(){
+       const pageTotal = Math.ceil(this.spotList.length / this.perpage); //總筆數 % 顯示筆數 = 頁數數量
+       for (let i = 0, arr = pageTotal ; i < arr; i++) {
+        //  [{0-20},{20-40},{40-60},{60-80},{80-100},...] 每20筆為一組
+        let list = this.spotList.slice((i * this.perpage), (i * this.perpage) + this.perpage);
+        this.spotListFilter.push(list);//篩選後放入陣列內
+       }    
+    },   
+    changePage(page){ //觸發當下頁面
+      this.pageStatus = page;
+    },
+    prevPage() { //上一頁
+      // console.log('上一頁')
+      if(this.pageStatus != 0){
+        return this.pageStatus --;
+      }
+    },
+    nextPage() {//下一頁
+      // console.log('下一頁')
+       if ((this.pageStatus+1) != this.spotListFilter.length) {
+        return this.pageStatus++;
+      }
+    }
+  },
+  computed: { //data其中的value有所變動會重新觸發
+    showPage() { //預設起始筆數
+      return this.spotListFilter[this.pageStatus];
+    }
+  },
+   created() { //生命週期
+    this.getData().then((data) => {
+      this.spotList = data;
+      this.getDataPage();
+    })
+  },
+});
+
+  //內容 - 根元件 => 內 props
+  app.component('card-component', {  
+    props: ['item'],
+    created() { //生命週期
+      console.log(this.item);
+    },
+    template: `<div class="col-md-6 py-2"><div class="card">` +
+      `<div class="card bg-dark text-white text-left">
+          <img class="card-img-top img-cover" height="155" :src="item.Picture1">
+          <div class="card-img-overlay d-flex justify-content-between align-items-end p-0 px-3"
+            style="background-color: rgba(0, 0, 0, .2)">
+            <h5 class="card-img-title-lg">{{item.Name}}</h5>
+            <h5 class="card-img-title-sm"></h5>
+          </div>
+      </div>`+
+      `<div class="card-body text-left">
+          <p class="card-text"><i class="far fa-clock fa-clock-time"></i>{{item.Opentime}}/p>
+          <p class="card-text"><i class="fas fa-map-marker-alt fa-map-gps"></i>{{item.Add}}</p>
+          <p class="card-text"><i class="fas fa-mobile-alt fa-mobile"></i>{{item.Tel}}</p>
+      </div>`+
+      `</div></div>`
+  });
+
+
+  //筆數 - 根元件=> 內(props) , 內 => 根元件($emit)
+  app.component('page-component', {
+    props: ['pageTotal','pageStatus'],
+    methods: {
+      //監聽事件 emitter.on('自訂義事件名稱','內部的參數帶進來的資料函式方式傳入') 由內往外傳
+      changePage(page) {
+        this.$emit('changePage', page);
+      },
+    },//.prevent可防止瀏覽器預設行為
+    template: `<ul class="pagination" id="pageid">`+
+              `<li @click.prevent="$emit('prevPage')" class="page-item" :class="{'disabled':pageStatus === 0}"><span class="page-link" role="button">上一頁</span></li>`+
+              `<li @click.prevent="changePage(page)" class="page-item" v-for="(item,page) in pageTotal.length" :key="page" :class="{'active':page == pageStatus}"><a class="page-link" role="button">{{page+1}}</a></li>`+
+              `<li @click.prevent="$emit('nextPage')" class="page-item" :class="{'disabled':(pageStatus+1) === pageTotal.length}"><span class="page-link" role="button">下一頁</span></li>`+
+              `</ul>`
+  });
+
+
+
+ 
+
+
+
+app.mount('#app');
+// fetch(jsonUrl, {method: 'get'})
+//   .then((response) => {
+//   return response.json();
+// }).then((data) => {
+//   jsonData = data.data.XML_Head.Infos.Info;
+//   console.log(jsonData)
+//   pagination(jsonData, 1);
+// })
+
+// function pagination(jsonData, nowPage) {
+//   console.log(nowPage);
+//   // 取得全部資料長度
+//   const dataTotal = jsonData.length;
+  
+//   // 設定要顯示在畫面上的資料數量
+//   // 預設每一頁只顯示 20 筆資料。
+//   const perpage = 20;
+  
+//   // page 按鈕總數量公式 總資料數量 / 每一頁要顯示的資料
+//   // 這邊要注意，因為有可能會出現餘數，所以要無條件進位。
+//   const pageTotal = Math.ceil(dataTotal / perpage);
+  
+//   // 當前頁數，對應現在當前頁數
+//   let currentPage = nowPage;
+  
+//   // 因為要避免當前頁數筆總頁數還要多，假設今天總頁數是 3 筆，就不可能是 4 或 5
+//   // 所以要在寫入一個判斷避免這種狀況。
+//   // 當"當前頁數"比"總頁數"大的時候，"當前頁數"就等於"總頁數"
+//   // 注意這一行在最前面並不是透過 nowPage 傳入賦予與 currentPage，所以才會寫這一個判斷式，但主要是預防一些無法預期的狀況，例如：nowPage 突然發神經？！
+//   if (currentPage > pageTotal) {
+//     currentPage = pageTotal;
+//   }
+  
+//   // 由前面可知 最小數字為 6 ，所以用答案來回推公式。
+//   const minData = (currentPage * perpage) - perpage + 1 ;
+//   const maxData = (currentPage * perpage) ;
+  
+//   // 先建立新陣列
+//   const data = [];
+//   // 這邊將會使用 ES6 forEach 做資料處理
+//   // 首先必須使用索引來判斷資料位子，所以要使用 index
+//   jsonData.forEach((item, index) => {
+//     // 獲取陣列索引，但因為索引是從 0 開始所以要 +1。
+//     const num = index + 1;
+//     // 這邊判斷式會稍微複雜一點
+//     // 當 num 比 minData 大且又小於 maxData 就push進去新陣列。
+//     if ( num >= minData && num <= maxData) {
+//       data.push(item);
+//     }
+//   })
+//   // 用物件方式來傳遞資料
+//   const page = {
+//     pageTotal,
+//     currentPage,
+//     hasPage: currentPage > 1,
+//     hasNext: currentPage < pageTotal,
+//   }
+//   displayData(data);
+//   pageBtn(page);
+// }
+
+// function displayData(data) {
+//   let str = '';
+//   data.forEach((item) => {
+//     str += `<div class="col-md-6 py-2">
+//       <div class="card">
+//         <div class="card bg-dark text-white text-left">
+//           <img class="card-img-top img-cover" height="155px" src="${item.Picture1}">
+//           <div class="card-img-overlay d-flex justify-content-between align-items-end p-0 px-3" style="background-color: rgba(0, 0, 0, .2)">
+//             <h5 class="card-img-title-lg">${item.Name}</h5><h5 class="card-img-title-sm">${item.Zone}</h5>
+//           </div>
+//         </div>
+//         <div class="card-body text-left">
+//             <p class="card-text"><i class="far fa-clock fa-clock-time"></i>&nbsp;${item.Opentime}</p>
+//             <p class="card-text"><i class="fas fa-map-marker-alt fa-map-gps"></i>&nbsp;${item.Add}</p>
+//             <p class="card-text"><i class="fas fa-mobile-alt fa-mobile"></i>&nbsp;${item.Tel}</p>
+//           ${ item.Ticketinfo ?
+//     `<div>
+            
+//             <p class="card-text"><i class="fas fa-tags text-warning"></i>&nbsp;${item.Ticketinfo}</p>
+//           </div>` : ''}
+//         </div>
+//       </div>
+//     </div>`;
+//   });
+//   content.innerHTML = str;
+// }
+
+// function pageBtn (page){
+//   let str = '';
+//   const total = page.pageTotal;
+  
+//   if(page.hasPage) {
+//     str += `<li class="page-item"><a class="page-link" href="#" data-page="${Number(page.currentPage) - 1}">Previous</a></li>`;
+//   } else {
+//     str += `<li class="page-item disabled"><span class="page-link">Previous</span></li>`;
+//   }
+  
+
+//   for(let i = 1; i <= total; i++){
+//     if(Number(page.currentPage) === i) {
+//       str +=`<li class="page-item active"><a class="page-link" href="#" data-page="${i}">${i}</a></li>`;
+//     } else {
+//       str +=`<li class="page-item"><a class="page-link" href="#" data-page="${i}">${i}</a></li>`;
+//     }
+//   };
+
+//   if(page.hasNext) {
+//     str += `<li class="page-item"><a class="page-link" href="#" data-page="${Number(page.currentPage) + 1}">Next</a></li>`;
+//   } else {
+//     str += `<li class="page-item disabled"><span class="page-link">Next</span></li>`;
+//   }
+
+//   pageid.innerHTML = str;
+// }
+
+// function switchPage(e){
+//   e.preventDefault();
+//   if(e.target.nodeName !== 'A') return;
+//   const page = e.target.dataset.page;
+//   pagination(jsonData, page);
+// }
+
+// pageid.addEventListener('click', switchPage);
+</script>
+
+<!-- 🙇🙇練習結束🙇🙇 -->
+
+
+    </main>
+  </div>
+</div>
+<!-- 
+<nav class="navbar fixed-top navbar-expand-sm navbar-dark bg-secondary">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="/">Vue 3 練習手冊</a>
+    <div class="collapse navbar-collapse" id="navbarCollapse">
+      <ul class="navbar-nav">
+        <li class="nav-item active">
+          <a class="nav-link " href="/es6/shorthand.html">JS 必備觀念</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="/intro/createApp.html">認識 Vue.js</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="/template/v-text.html">模板</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="/optionsApi/options-methods.html">方法</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" href="/components/component_register.html">元件</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="/advApi/adv-refs.html">進階</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="/router/vue-router.html">路由</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link " href="/composition/proxy.html">Composition API</a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav> -->
+
+<footer class="footer py-2 bg-light">
+  <div class="container text-center">
+    <small class="text-black-50 fw-light mb-0">六角學院 Vue 課程專屬文件</small>
+  </div>
+</footer>
+<link rel="stylesheet" href="/stylesheets/all.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+</body>
+</html>
